@@ -2,7 +2,22 @@
 
 > Bootstrap document for adding Typst support (live split-view preview) and an optional Helix keymap to a personal Trilium fork, designed to rebase cleanly onto upstream releases.
 >
-> **Verified against:** `TriliumNext/Trilium` main @ `c12c814` (v0.106.0, 2026-10-05). File paths and line references below are from that commit; re-check them with the `grep` commands given in each step if upstream has moved.
+> **Base:** upstream tag `v0.106.0` (`c0fdceba3b`, 2026-09-25). The file survey in §6–§7 was done against a later `main` (`c12c814`), so its "~line" references are approximate; re-locate them with the `grep` commands in §11.
+
+---
+
+## 0. Status (2026-10-08)
+
+| Phase | Commit | State |
+|---|---|---|
+| 0: spike | (none) | **Done.** Wasm init ~95 ms, first compile ~180 ms, warm recompiles 5–8 ms. |
+| 1: `packages/typst` | A `77f41cdbb4` | **Done.** |
+| 1: wire into client | B `ea2303b882` | **Done.** |
+| 1: note previews (§6.3) | (none) | Not started (optional). |
+| 2: Helix keymap | C | Not started. |
+| 3: later improvements | (none) | Not started. |
+
+Branch `xba-fork` = `v0.106.0` + this plan + A + B. On 2026-10-08 it was moved off a later `main` onto `v0.106.0` by rebasing only the fork commits (§4). Verified on that base: `pnpm typecheck` clean; client (note types, NoteDetail, fnote and neighbours), `typst`, `commons`, `codemirror` and `highlightjs` specs green; `pnpm client:build` emits the Typst chunk, the worker, both wasm files and all 17 fonts. **Not yet verified in the running app**: the §9 checklist is still open.
 
 ---
 
@@ -75,29 +90,52 @@ NoteDetail.tsx  ──dispatch──►  "typst" widget (note_types.tsx registry
 ```
 upstream/main  ──●──●──●── vX.Y.Z
                               \
-fork/typst                     A ── B ── C
+xba-fork                       A ── B ── C
 ```
 
-Keep the fork as **three commits**, rebased as a unit:
+Keep the fork as a few commits on a release tag, rebased as a unit (branch `xba-fork`):
 
+- **`initial plan`**: this file. New file only.
 - **A: `feat(typst): add packages/typst`**: new files only. Never conflicts.
 - **B: `feat(typst): wire Typst notes into client`**: the small upstream edits in §6.
-- **C: `feat(editor): helix keymap option`**: optional, independent of A and B.
+- **C: `feat(editor): helix keymap option`**: optional, independent of A and B. Not written yet.
+
+`origin` is the personal fork (`bbxiao1/Trilium`); add upstream once with
+`git remote add upstream https://github.com/TriliumNext/Trilium.git`.
 
 Rebase routine on each upstream release:
 
 ```bash
 git fetch upstream --tags
-git rebase --onto vNEW vOLD fork/typst
-git range-diff vOLD..fork/typst@{1} vNEW..fork/typst   # review what changed in B/C
-pnpm install && pnpm typecheck && pnpm --filter client test
+git rebase --onto vNEW vOLD xba-fork      # replays only the fork commits
+git range-diff vOLD..xba-fork@{1} vNEW..xba-fork   # review what changed in B/C
+pnpm install && pnpm typecheck && pnpm --filter client test note_types NoteDetail
+git push --force-with-lease origin xba-fork
 ```
 
-Keep commit B's diff small enough to re-apply by hand if a rebase gets messy. The §6 table doubles as the re-application checklist.
+**Always pass the old base.** A plain `git rebase vNEW` (or `-i`) from a branch that started on
+`main` replays every upstream commit since the tag, over a thousand of them, with merges flattened.
+
+**Lockfile conflicts**: take the base side (`git checkout --ours pnpm-lock.yaml` during the rebase),
+then `pnpm install --lockfile-only` and stage it. Use pnpm 12 (the version in `packageManager`);
+pnpm 11 rewrites the whole file. On NixOS the npm-distributed pnpm 12 binary does not run; use a
+Nix-built one with `npm_config_manage_package_manager_versions=false`, and drop any entries it adds
+for packages the base lists under `ignoredOptionalDependencies` (e.g. `@parcel/watcher`).
+
+**Expect B to conflict where upstream reworked the new-note menu** (`note_types.ts`, its spec):
+keep the base side and re-add only the Typst lines (§6.0, "New-note menu entry"). Where the base
+has upstream's grouped menu (`MENU_GROUPS`, a Code-language submenu, as `main` did after v0.106.0),
+also put Typst after Markdown in the first `MENU_GROUPS` group and filter `TYPST_NOTE_TYPE_MIME` out of
+`getCodeLanguageItems()` next to Markdown; the pre-rebase commit `d7b55d47ba` shows that version.
+
+Keep commit B's diff small enough to re-apply by hand if a rebase gets messy. The §6.1 table plus §6.0 double as the re-application checklist.
 
 ---
 
-## 5. Phase 0: spike (half a day, before touching Trilium)
+## 5. Phase 0: spike (done)
+
+Result: the API below works with typst.ts 0.7.0 pinned; wasm init ~95 ms, first compile ~180 ms,
+warm recompiles 5–8 ms; no extra debounce was added. Kept for reference:
 
 Validate typst.ts in isolation before integrating. In a scratch Vite project:
 
@@ -113,7 +151,37 @@ Validate typst.ts in isolation before integrating. In a scratch Vite project:
 
 ---
 
-## 6. Phase 1: wire into Trilium (commit B)
+## 6. Phase 1: wire into Trilium (commits A and B, done)
+
+### 6.0 As built, where it differs from the sketch below
+
+- **Page width is 16cm, not `auto`**: with `width: auto` prose never wraps. Preamble:
+  `#set page(width: 16cm, height: auto, margin: 1em, fill: none)` plus
+  `#set text(fill: rgb(r, g, b))` from `getComputedStyle(document.body).color`. No `#typstRaw`
+  label; the note's own set rules override the preamble.
+- **`packages/typst` has no `client.ts` or `fonts.ts`**: worker lifecycle lives in `index.ts`,
+  the preamble and diagnostic formatting in `preamble.ts` (with `preamble.spec.ts`). The worker
+  handles requests one at a time (they share `/main.typ`) and retries the wasm load after a
+  failure. Stale responses are not dropped; `SvgSplitEditor` debouncing has been enough.
+- **Fonts**: Typst's 17 default text fonts (8.4 MB, typst-assets v0.13.1) are vendored in
+  `packages/typst/fonts/` and emitted via `import.meta.glob`. Compiler wasm is 28 MB (11 MB gzip).
+  No `optimizeDeps.exclude` and no `vite.config.mts` change were needed.
+- **Syntax highlighting** uses `codemirror-lang-typst/lezer` (`typst_lezer()`): the package's default
+  `typst()` needs a wasm plugin in Vite. highlight.js has no Typst grammar, so
+  `packages/highlightjs/src/syntax_highlighting.ts` maps `text/x-typst` to `null` (required by its
+  mime table type).
+- **New-note menu entry** (was "later"): `TYPST_NOTE_TYPE_MIME` and a `NOTE_TYPES` entry after
+  Markdown in `apps/client/src/services/note_types.ts`; `isCurrentNoteType()` ticks only the Typst
+  entry for a Typst note; `selectableNoteTypes(true)` leaves it out beside the MIME list. The entry
+  sets the mime itself, so it works where `codeNotesMimeTypes` predates Typst.
+- **`BLOB_BACKED_TYPES`** in `NoteDetail.tsx` includes `"typst"`, so a withheld blob shows the stub
+  instead of an editor that saves empty content back.
+- **`Typst.tsx`** passes no `noteType` (the default suits) and uses `editable_code.placeholder`.
+- **Extra upstream edits**: `note_types.ts` + spec, `NoteDetail.spec.ts`, `translation.json`
+  (`note_types.typst`), `highlightjs`, `pnpm-lock.yaml`, and `tsconfig` references to
+  `packages/typst` in `tsconfig.json`, `apps/client/tsconfig.json` and `tsconfig.app.json`.
+
+The original plan follows.
 
 ### 6.1 Upstream files touched
 
@@ -249,7 +317,9 @@ Because every CodeMirror editor goes through `Code.tsx` → `packages/codemirror
 
 ## 9. Test checklist
 
-Adapted from Trilium's own note-type checklist:
+Unit-tested so far: `isTypst()` routing and the blob stub (`NoteDetail.spec.ts`), the menu entry
+(`note_types.spec.ts`), preamble and diagnostics (`packages/typst`). Everything below still needs a
+manual pass in the app. Adapted from Trilium's own note-type checklist:
 
 - [ ] Create a code note, choose **Typst** as the language → split view with a preview appears.
 - [ ] Typing updates the preview; a syntax error shows the error badge and keeps the last good render.
