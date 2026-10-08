@@ -69,6 +69,7 @@ describe("getExtendedWidgetType blob-stub routing", () => {
             isProtected: false,
             isTriliumSqlite: () => false,
             isMarkdown: () => false,
+            isTypst: () => false,
             isIconPack: () => false,
             getBlob: async () => ({ isStubbed: false }),
             ...overrides
@@ -100,5 +101,13 @@ describe("getExtendedWidgetType blob-stub routing", () => {
         const note = fakeNote({ type: "launcher", getBlob });
         expect(await getExtendedWidgetType(note, fakeContext())).toBe("doc");
         expect(getBlob).not.toHaveBeenCalled();
+    });
+
+    it("routes a Typst note to the Typst widget, or the stub when its blob was withheld", async () => {
+        const typst = { type: "code", isTypst: () => true };
+        expect(await getExtendedWidgetType(fakeNote(typst), fakeContext())).toBe("typst");
+
+        const stubbed = fakeNote({ ...typst, getBlob: async () => ({ isStubbed: true }) });
+        expect(await getExtendedWidgetType(stubbed, fakeContext())).toBe("blobStub");
     });
 });
