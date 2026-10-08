@@ -2526,6 +2526,7 @@
     "text": "Text",
     "code": "Code",
     "markdown": "Markdown",
+    "typst": "Typst",
     "saved-search": "Saved Search",
     "relation-map": "Relation Map",
     "note-map": "Note Map",

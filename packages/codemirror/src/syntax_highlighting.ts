@@ -198,6 +198,7 @@ const byMimeType: Record<SupportedMimeTypes, (() => Promise<StreamParser<unknown
     "text/x-ttcn-cfg": async () => (await import('@codemirror/legacy-modes/mode/ttcn-cfg')).ttcnCfg,
     "text/x-ttcn": async () => (await import('@codemirror/legacy-modes/mode/ttcn')).ttcn,
     "text/x-twig": async () => ((await import('@ssddanbrown/codemirror-lang-twig')).twig()),
+    "text/x-typst": async () => (await import('codemirror-lang-typst/lezer')).typst_lezer(),
     "text/x-vb": async () => (await import('@codemirror/legacy-modes/mode/vb')).vb,
     "text/x-verilog": async () => (await import('@codemirror/legacy-modes/mode/verilog')).verilog,
     "text/x-vhdl": async () => (await import('@codemirror/legacy-modes/mode/vhdl')).vhdl,

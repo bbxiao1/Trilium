@@ -226,7 +226,7 @@ function SwitchSplitOrientationButton({ note, isReadOnly, isDefaultViewMode }: N
 function DisplayModeSwitcher({ note, noteContext, isDefaultViewMode }: NoteActionsCustomInnerProps) {
     const [ displayMode, setDisplayMode ] = useNoteLabel(note, "displayMode");
     const readOnly = useEffectiveReadOnly(note, noteContext);
-    const isEnabled = (note.isMarkdown() || note.type === "mermaid" || note.isIconPack()) && note.isContentAvailable() && isDefaultViewMode;
+    const isEnabled = (note.isMarkdown() || note.isTypst() || note.type === "mermaid" || note.isIconPack()) && note.isContentAvailable() && isDefaultViewMode;
     if (!isEnabled) return null;
 
     // Mirror SplitEditor's mode resolution so the active button matches the actual pane.

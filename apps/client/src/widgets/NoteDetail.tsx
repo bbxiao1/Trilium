@@ -412,6 +412,8 @@ export async function getExtendedWidgetType(note: FNote | null | undefined, note
         resultingType = "sqlConsole";
     } else if (note.isMarkdown()) {
         resultingType = "markdown";
+    } else if (note.isTypst()) {
+        resultingType = "typst";
     } else if (note.isIconPack()) {
         resultingType = "iconPack";
     } else if (type === "code" && (await noteContext?.isReadOnly())) {
@@ -455,7 +457,7 @@ export async function getExtendedWidgetType(note: FNote | null | undefined, note
 // Extended note types that render or edit a note's blob content, and so must fall back to the
 // "blobStub" placeholder when that content was not synced to this device.
 const BLOB_BACKED_TYPES = new Set<ExtendedNoteType>([
-    "editableText", "readOnlyText", "editableCode", "readOnlyCode", "markdown",
+    "editableText", "readOnlyText", "editableCode", "readOnlyCode", "markdown", "typst",
     "file", "image", "mermaid", "canvas", "mindMap", "render", "spreadsheet"
 ]);
 

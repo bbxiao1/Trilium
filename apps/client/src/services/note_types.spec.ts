@@ -424,6 +424,18 @@ describe("isCurrentNoteType", () => {
         }
     });
 
+    it("picks the Typst entry for a Typst note, and only for one", () => {
+        const TYPST = { type: "code", mime: "text/x-typst" } as const;
+        const typst = buildNote({ title: "typst", type: "code", mime: "text/x-typst" });
+        expect(isCurrentNoteType(TYPST, typst)).toBe(true);
+        expect(isCurrentNoteType(CODE, typst)).toBe(false);
+        expect(isCurrentNoteType(MARKDOWN, typst)).toBe(false);
+
+        for (const mime of [ "application/javascript", "text/x-markdown" ]) {
+            expect(isCurrentNoteType(TYPST, buildNote({ title: mime, type: "code", mime }))).toBe(false);
+        }
+    });
+
     it("matches every other type on the type alone, and nothing without a note", () => {
         const text = buildNote({ title: "prose", type: "text", mime: "text/html" });
         expect(isCurrentNoteType({ type: "text", mime: "text/html" }, text)).toBe(true);
@@ -448,6 +460,13 @@ describe("selectableNoteTypes", () => {
 
         // On its own the menu is the only way to reach Markdown, so it stays.
         expect(markdownEntry(false)).toHaveLength(1);
+    });
+
+    it("treats Typst like Markdown beside the MIME list", () => {
+        const typstEntry = (withMimeList: boolean) =>
+            selectableNoteTypes(withMimeList).filter((nt) => nt.mime === "text/x-typst");
+        expect(typstEntry(true)).toHaveLength(0);
+        expect(typstEntry(false)).toHaveLength(1);
     });
 
     it("leaves out what cannot be created either way", () => {

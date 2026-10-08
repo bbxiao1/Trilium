@@ -230,6 +230,9 @@ importers:
       '@triliumnext/split.js':
         specifier: workspace:*
         version: link:../../packages/splitjs
+      '@triliumnext/typst':
+        specifier: workspace:*
+        version: link:../../packages/typst
       '@univerjs/preset-sheets-conditional-formatting':
         specifier: 0.25.1
         version: 0.25.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
@@ -1277,6 +1280,9 @@ importers:
       codemirror-lang-nim:
         specifier: 0.1.0
         version: 0.1.0
+      codemirror-lang-typst:
+        specifier: 0.6.0
+        version: 0.6.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1534,6 +1540,18 @@ importers:
       vitest:
         specifier: 5.0.1
         version: 5.0.1(@types/node@24.13.6)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(happy-dom@20.14.5)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/typst:
+    dependencies:
+      '@myriaddreamin/typst-ts-renderer':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@myriaddreamin/typst-ts-web-compiler':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@myriaddreamin/typst.ts':
+        specifier: 0.7.0
+        version: 0.7.0(@myriaddreamin/typst-ts-renderer@0.7.0)(@myriaddreamin/typst-ts-web-compiler@0.7.0)
 
 packages:
 
@@ -3467,6 +3485,23 @@ packages:
       zod: 4.6.5
     peerDependenciesMeta:
       '@cfworker/json-schema':
+        optional: true
+
+  '@myriaddreamin/typst-ts-renderer@0.7.0':
+    resolution: {integrity: sha512-3sXIGxZn9MufPrPn6251DeuLf2FIEILYNzY5lX0XOJmaIYqgvQ3qpfqkCjgQD+splBvt5R1N3BuuNFrZKsHhMw==}
+
+  '@myriaddreamin/typst-ts-web-compiler@0.7.0':
+    resolution: {integrity: sha512-nMwMcfOBy5pABPDuVM7/u8425SxhPUM+OJe6daqqgVOT3+neCTz4JKwx2L8XasfEHTNvd0cUI07LR9q5ADo7Gw==}
+
+  '@myriaddreamin/typst.ts@0.7.0':
+    resolution: {integrity: sha512-JtO5Td/1QesH1IBKAZtbayFNK8u2sl3iz18Y67uYqBEdcXiu3z+wpZcDDKlmVJvAcCgSjHTnuk6ZLfkYclrGGQ==}
+    peerDependencies:
+      '@myriaddreamin/typst-ts-renderer': ^0.7.0
+      '@myriaddreamin/typst-ts-web-compiler': ^0.7.0
+    peerDependenciesMeta:
+      '@myriaddreamin/typst-ts-renderer':
+        optional: true
+      '@myriaddreamin/typst-ts-web-compiler':
         optional: true
 
   '@napi-rs/canvas-android-arm64@1.0.9':
@@ -6453,6 +6488,9 @@ packages:
   codemirror-lang-nim@0.1.0:
     resolution: {integrity: sha512-HL++tDpTLx+gmIWl6uMpdREhR9RX74SZ1M3CM/ZDV+GywHjjiiQJ0mVx5wiw3wOghY72DMq8FCRy4S1TmotqCg==}
 
+  codemirror-lang-typst@0.6.0:
+    resolution: {integrity: sha512-arxPg4g2tc+VeDErihW0+PuYQ5Hl7sAQ1FgqF/Hbta+0pRF6YER6L+S+QUFE56ev9azfxWYqMqHOuPQmPjEgSQ==}
+
   collapse-white-space@2.1.0:
     resolution: {integrity: sha512-loKTxY1zCOuG4j9f6EPnuyyYkf58RnhhWTvRoZEokgB+WbdXehfjFviyOVYkqzEWz1Q5kRiZdBYS5SwxbQYwzw==}
 
@@ -8157,6 +8195,9 @@ packages:
 
   idb-keyval@6.3.0:
     resolution: {integrity: sha512-um+2dgAWmYsu615EXpWVwSmapJhON0G43t3Ka/EVaohzPQXSMqKEqeDK/oIW3Ow+BXaF2PvSc+oBTFp793A5Ow==}
+
+  idb@7.1.1:
+    resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -14885,6 +14926,17 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@myriaddreamin/typst-ts-renderer@0.7.0': {}
+
+  '@myriaddreamin/typst-ts-web-compiler@0.7.0': {}
+
+  '@myriaddreamin/typst.ts@0.7.0(@myriaddreamin/typst-ts-renderer@0.7.0)(@myriaddreamin/typst-ts-web-compiler@0.7.0)':
+    dependencies:
+      idb: 7.1.1
+    optionalDependencies:
+      '@myriaddreamin/typst-ts-renderer': 0.7.0
+      '@myriaddreamin/typst-ts-web-compiler': 0.7.0
+
   '@napi-rs/canvas-android-arm64@1.0.9':
     optional: true
 
@@ -18813,6 +18865,16 @@ snapshots:
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.10
 
+  codemirror-lang-typst@0.6.0:
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/lint': 6.9.7
+      '@codemirror/state': 6.7.5
+      '@codemirror/view': 6.43.12
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+
   collapse-white-space@2.1.0: {}
 
   color-convert@0.5.3:
@@ -20918,6 +20980,8 @@ snapshots:
       safer-buffer: 2.1.2
 
   idb-keyval@6.3.0: {}
+
+  idb@7.1.1: {}
 
   ieee754@1.2.1: {}
 

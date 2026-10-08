@@ -49,6 +49,9 @@
       "path": "./packages/highlightjs"
     },
     {
+      "path": "./packages/typst"
+    },
+    {
       "path": "./packages/share-theme"
     },
     {

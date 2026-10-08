@@ -26,6 +26,7 @@
     "@triliumnext/commons": "workspace:*",
     "@triliumnext/highlightjs": "workspace:*",
     "@triliumnext/split.js": "workspace:*",
+    "@triliumnext/typst": "workspace:*",
     "@univerjs/preset-sheets-conditional-formatting": "0.25.1",
     "@univerjs/preset-sheets-core": "0.25.1",
     "@univerjs/preset-sheets-data-validation": "0.25.1",
