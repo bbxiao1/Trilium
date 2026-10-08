@@ -32,6 +32,7 @@ export interface NoteTypeMapping {
 
 /** The mime carried by the Markdown entry, which shares `type: "code"` with the plain code one. */
 export const MARKDOWN_NOTE_TYPE_MIME = "text/x-markdown";
+export const TYPST_NOTE_TYPE_MIME = "text/x-typst";
 
 export const NOTE_TYPES: NoteTypeMapping[] = [
     // The suggested note type ordering method: insert the item into the corresponding group,
@@ -62,6 +63,7 @@ export const NOTE_TYPES: NoteTypeMapping[] = [
     // Code notes
     { type: "code", mime: "text/plain", title: t("note_types.code"), icon: "bx-code" },
     { type: "code", mime: MARKDOWN_NOTE_TYPE_MIME, title: t("note_types.markdown"), icon: "bxl-markdown", isNew: true },
+    { type: "code", mime: TYPST_NOTE_TYPE_MIME, title: t("note_types.typst"), icon: "bx-math" },
 
     // Reserved types (cannot be created by the user)
     { type: "contentWidget", mime: "", title: t("note_types.widget"), reserved: true },
@@ -80,6 +82,9 @@ export const NOTE_TYPES: NoteTypeMapping[] = [
 export function isCurrentNoteType(entry: Pick<NoteTypeMapping, "type" | "mime">, note: FNote | null | undefined) {
     if (!note || entry.type !== note.type) return false;
     if (entry.type !== "code") return true;
+    if (note.isTypst() || entry.mime === TYPST_NOTE_TYPE_MIME) {
+        return note.isTypst() && entry.mime === TYPST_NOTE_TYPE_MIME;
+    }
     return note.isMarkdown() === (entry.mime === MARKDOWN_NOTE_TYPE_MIME);
 }
 
@@ -93,7 +98,7 @@ export function isCurrentNoteType(entry: Pick<NoteTypeMapping, "type" | "mime">,
 export function selectableNoteTypes(withMimeList: boolean) {
     return NOTE_TYPES.filter((nt) => !nt.reserved && !nt.static
         && (nt.type !== "llmChat" || isExperimentalFeatureEnabled("llm"))
-        && (!withMimeList || nt.mime !== MARKDOWN_NOTE_TYPE_MIME));
+        && (!withMimeList || (nt.mime !== MARKDOWN_NOTE_TYPE_MIME && nt.mime !== TYPST_NOTE_TYPE_MIME)));
 }
 
 /**
@@ -290,7 +295,7 @@ function buildNoteTypeItems(data: NoteTypeData, command?: TreeCommandNames) {
  * last group opens from the "More" submenu. A note type in none of them is not offered.
  */
 const MENU_GROUPS: Pick<NoteTypeMapping, "type" | "mime">[][] = [
-    [ { type: "text" }, { type: "code", mime: MARKDOWN_NOTE_TYPE_MIME }, { type: "code", mime: "text/plain" }, { type: "spreadsheet" }, { type: "llmChat" } ],
+    [ { type: "text" }, { type: "code", mime: MARKDOWN_NOTE_TYPE_MIME }, { type: "code", mime: TYPST_NOTE_TYPE_MIME }, { type: "code", mime: "text/plain" }, { type: "spreadsheet" }, { type: "llmChat" } ],
     [ { type: "canvas" }, { type: "mermaid" }, { type: "mindMap" }, { type: "relationMap" } ]
 ];
 const MORE_GROUP: Pick<NoteTypeMapping, "type" | "mime">[] = [
@@ -336,7 +341,7 @@ function getBlankNoteTypes(command?: TreeCommandNames): MenuCommandItem<TreeComm
 function getCodeLanguageItems(command?: TreeCommandNames): MenuItem<TreeCommandNames>[] {
     mimeTypes.loadMimeTypes();
     const languages = mimeTypes.getEnabledMimeTypes()
-        .filter((mimeType) => mimeType.mime !== MARKDOWN_NOTE_TYPE_MIME)
+        .filter((mimeType) => mimeType.mime !== MARKDOWN_NOTE_TYPE_MIME && mimeType.mime !== TYPST_NOTE_TYPE_MIME)
         .map<MenuItem<TreeCommandNames>>((mimeType) => ({
             title: escapeHtml(mimeType.title),
             uiIcon: getCodeLanguageIcon(mimeType),

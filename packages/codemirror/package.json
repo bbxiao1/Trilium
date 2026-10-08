@@ -69,7 +69,8 @@
     "@triliumnext/commons": "workspace:*",
     "codemirror-lang-elixir": "4.0.1",
     "codemirror-lang-hcl": "0.2.0",
-    "codemirror-lang-nim": "0.1.0"
+    "codemirror-lang-nim": "0.1.0",
+    "codemirror-lang-typst": "0.6.0"
   },
   "devDependencies": {
     "@lezer/generator": "1.8.1",
