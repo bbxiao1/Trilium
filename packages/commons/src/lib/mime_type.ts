@@ -212,6 +212,7 @@ const MIME_TYPES_DICT_RAW = [
     { title: "Twig", mime: "text/x-twig", mdLanguageCode: "twig" },
     { title: "TypeScript-JSX", mime: "text/typescript-jsx", aliases: ["tsx", "typescriptreact"], default: true },
     { title: "TypeScript", mime: "application/typescript", mdLanguageCode: "typescript", aliases: ["ts"], default: true, icon: "bx bxl-typescript" },
+    { title: "Typst", mime: "text/x-typst", mdLanguageCode: "typst", default: true },
     { title: "VB.NET", mime: "text/x-vb", mdLanguageCode: "vbnet", aliases: ["vb"] },
     { title: "VBScript", mime: "text/vbscript", mdLanguageCode: "vbscript" },
     { title: "Velocity", mime: "text/velocity", aliases: ["velocity", "vtl"] },

@@ -44,6 +44,9 @@
       "path": "../../packages/highlightjs/tsconfig.lib.json"
     },
     {
+      "path": "../../packages/typst/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/commons/tsconfig.lib.json"
     },
     {

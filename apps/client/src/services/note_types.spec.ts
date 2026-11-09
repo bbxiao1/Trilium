@@ -503,13 +503,13 @@ describe("new template badges", () => {
     it("groups the note types of the menu by kind, common ones first, and offers each exactly once", async () => {
         withTemplates();
         const restore = withTemplatesRoot([ fakeTemplate("tpl-ai", [ "template", "aiQuickAction" ], "AI quick action") ]);
-        const key = (i: any) => i.kind ?? (i.mime === "text/x-markdown" ? "markdown" : i.type) ?? i.title;
+        const key = (i: any) => i.kind ?? (i.mime === "text/x-markdown" ? "markdown" : i.mime === "text/x-typst" ? "typst" : i.type) ?? i.title;
         try {
             llmFlag.mockReturnValue(true);
             const data = await noteTypesService.loadNoteTypeData();
             const menu: any[] = noteTypesService.buildNoteTypeItems(data, "insertChildNote" as never);
             expect(menu.map(key)).toEqual([
-                "text", "markdown", "code", "spreadsheet", "llmChat",
+                "text", "markdown", "typst", "code", "spreadsheet", "llmChat",
                 "separator",
                 "canvas", "mermaid", "mindMap", "relationMap",
                 "separator",
@@ -520,13 +520,13 @@ describe("new template badges", () => {
             const offered = [ ...menu, ...menu.at(-1).items ]
                 .filter((i) => i.command && !i.templateNoteId && !i.notePreset).map(key);
             const creatable = selectableNoteTypes(false).filter((nt) => nt.type !== "book")
-                .map((nt) => (nt.mime === "text/x-markdown" ? "markdown" : nt.type));
+                .map((nt) => (nt.mime === "text/x-markdown" ? "markdown" : nt.mime === "text/x-typst" ? "typst" : nt.type));
             expect([ ...offered ].sort()).toEqual([ ...creatable, "noteMap", "search" ].sort());
 
             // Without AI, the chat is left out of its group.
             llmFlag.mockReturnValue(false);
             const withoutAi = noteTypesService.buildNoteTypeItems(data, "insertChildNote" as never).map(key);
-            expect(withoutAi.slice(0, 5)).toEqual([ "text", "markdown", "code", "spreadsheet", "separator" ]);
+            expect(withoutAi.slice(0, 6)).toEqual([ "text", "markdown", "typst", "code", "spreadsheet", "separator" ]);
 
         } finally {
             restore();
@@ -645,6 +645,18 @@ describe("isCurrentNoteType", () => {
         }
     });
 
+    it("picks the Typst entry for a Typst note, and only for one", () => {
+        const TYPST = { type: "code", mime: "text/x-typst" } as const;
+        const typst = buildNote({ title: "typst", type: "code", mime: "text/x-typst" });
+        expect(isCurrentNoteType(TYPST, typst)).toBe(true);
+        expect(isCurrentNoteType(CODE, typst)).toBe(false);
+        expect(isCurrentNoteType(MARKDOWN, typst)).toBe(false);
+
+        for (const mime of [ "application/javascript", "text/x-markdown" ]) {
+            expect(isCurrentNoteType(TYPST, buildNote({ title: mime, type: "code", mime }))).toBe(false);
+        }
+    });
+
     it("matches every other type on the type alone, and nothing without a note", () => {
         const text = buildNote({ title: "prose", type: "text", mime: "text/html" });
         expect(isCurrentNoteType({ type: "text", mime: "text/html" }, text)).toBe(true);
@@ -669,6 +681,13 @@ describe("selectableNoteTypes", () => {
 
         // On its own the menu is the only way to reach Markdown, so it stays.
         expect(markdownEntry(false)).toHaveLength(1);
+    });
+
+    it("treats Typst like Markdown beside the MIME list", () => {
+        const typstEntry = (withMimeList: boolean) =>
+            selectableNoteTypes(withMimeList).filter((nt) => nt.mime === "text/x-typst");
+        expect(typstEntry(true)).toHaveLength(0);
+        expect(typstEntry(false)).toHaveLength(1);
     });
 
     it("leaves out what cannot be created either way", () => {

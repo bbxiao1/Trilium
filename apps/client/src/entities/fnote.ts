@@ -1008,6 +1008,10 @@ export default class FNote {
         return this.type === "code" && isMarkdownMime(this.mime);
     }
 
+    isTypst() {
+        return this.type === "code" && this.mime === "text/x-typst";
+    }
+
     isIconPack() {
         // Icon-pack manifests exist both as JSON `code` notes (created manually per the docs) and as
         // `file` notes (produced by the icon-pack builder and shipped in distributable zips). Disabled
