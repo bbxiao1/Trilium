@@ -4,7 +4,9 @@ import NoteContext from "../../components/note_context.js";
 import splitService from "../../services/resizer.js";
 import { isMobile } from "../../services/utils.js";
 import type BasicWidget from "../basic_widget.js";
+import { getTabToward } from "../mobile_widgets/tab_swipe.js";
 import NoteContextAwareWidget from "../note_context_aware_widget.js";
+import { createCaretStop, markVisibleSplits } from "../note_wrapper.js";
 import FlexContainer from "./flex_container.js";
 
 interface SplitNoteWidget extends BasicWidget {
@@ -16,10 +18,14 @@ interface SplitNoteWidget extends BasicWidget {
 
 type WidgetFactory = () => SplitNoteWidget;
 
+/** How long, in ms, the panes of the next tab to render wait on mobile after a tab is shown or rendered. */
+const NEIGHBOUR_RENDER_DELAY = 1000;
+
 export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
 
     private widgetFactory: WidgetFactory;
     private widgets: Record<string, SplitNoteWidget>;
+    private neighbourRenderTimer?: ReturnType<typeof setTimeout>;
 
     constructor(widgetFactory: WidgetFactory) {
         super("row");
@@ -32,6 +38,11 @@ export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
         this.collapsible();
     }
 
+    doRender() {
+        super.doRender();
+        this.$widget.append(createCaretStop(), createCaretStop());
+    }
+
     async newNoteContextCreatedEvent({ noteContext }: EventData<"newNoteContextCreated">) {
         const widget = this.widgetFactory();
 
@@ -40,7 +51,7 @@ export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
         $renderedWidget.attr("data-ntx-id", noteContext.ntxId);
         $renderedWidget.on("click", () => appContext.tabManager.activateNoteContext(noteContext.ntxId));
 
-        this.$widget.append($renderedWidget);
+        this.$widget.children(".caret-stop").last().before($renderedWidget);
 
         widget.handleEvent("initialRenderComplete", {});
 
@@ -216,6 +227,7 @@ export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
 
     activeContextChangedEvent() {
         this.refresh();
+        this.renderNeighbourTabsLater();
     }
 
     noteSwitchedAndActivatedEvent() {
@@ -269,12 +281,7 @@ export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
             child.$widget.toggleClass("active", !!child.noteContext?.isActive());
         }
 
-        // Mark the rightmost visible split. CSS can't reach a split from outside #center-pane, so
-        // siblings of it (the right pane peek button) need this hook to match its background.
-        // Read the DOM, not `this.children`: splits are reordered in place, the array is not.
-        const $visibleSplits = this.$widget.children(".note-split:not(.hidden-ext)");
-        $visibleSplits.removeClass("last-visible");
-        $visibleSplits.last().addClass("last-visible");
+        markVisibleSplits(this.$widget[0]);
     }
 
     toggleInt(show: boolean) {} // not needed
@@ -351,6 +358,29 @@ export default class SplitNoteContainer extends FlexContainer<SplitNoteWidget> {
         return Promise.all(promises);
     }
 
+    /**
+     * On mobile, renders the panes of the tabs before and after the active one while they stay hidden,
+     * one tab per delay, so that a swipe to either slides in a rendered note.
+     */
+    private renderNeighbourTabsLater() {
+        if (!isMobile()) return;
+
+        clearTimeout(this.neighbourRenderTimer);
+        const renderNext = () => {
+            const tab = getNeighbourTabs().find((neighbour) => neighbour.getSubContexts()
+                .some((subContext) => subContext.ntxId && !this.widgets[subContext.ntxId]?.hasBeenAlreadyShown));
+            if (!tab) return;
+
+            const timer = this.neighbourRenderTimer;
+            void this.refreshNotShown({ noteContext: tab }).then(() => {
+                if (this.neighbourRenderTimer === timer) {
+                    this.neighbourRenderTimer = setTimeout(renderNext, NEIGHBOUR_RENDER_DELAY);
+                }
+            });
+        };
+        this.neighbourRenderTimer = setTimeout(renderNext, NEIGHBOUR_RENDER_DELAY);
+    }
+
     /** Sends `setNoteContext` to the widget, unless the widget has already received it. */
     private async provideNoteContext(widget: SplitNoteWidget, noteContext: NoteContext) {
         if (widget.hasNoteContext) {
@@ -369,4 +399,9 @@ function recursiveCleanup(widget: Component) {
     if ("cleanup" in widget && typeof widget.cleanup === "function") {
         widget.cleanup();
     }
+}
+
+/** The tabs before and after the active one, which a swipe on mobile leads to. */
+function getNeighbourTabs() {
+    return [ getTabToward("next"), getTabToward("previous") ].filter((tab) => !!tab);
 }

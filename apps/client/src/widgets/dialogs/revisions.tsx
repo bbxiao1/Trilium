@@ -1,16 +1,19 @@
 import "./revisions.css";
 
+import {
+    applyListItemAlignment
+} from "@triliumnext/ckeditor5/src/plugins/list_item_alignment_read_only.js";
 import { dayjs, type RevisionItem, type RevisionPojo, safeHostname, safeLinkPreviewHref } from "@triliumnext/commons";
 import clsx from "clsx";
 import { diffWords } from "diff";
-import HtmlDiff from "htmldiff-js";
 import { type CSSProperties, Fragment } from "preact";
-import { Dispatch, StateUpdater, useEffect, useRef, useState } from "preact/hooks";
+import { Dispatch, StateUpdater, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 
 import appContext from "../../components/app_context";
 import FNote from "../../entities/fnote";
 import dialog from "../../services/dialog";
 import froca from "../../services/froca";
+import { diffHtml } from "../../services/html_diff";
 import { t } from "../../services/i18n";
 import { applyLinkEmbeds } from "../../services/link_embed";
 import open from "../../services/open";
@@ -685,6 +688,7 @@ export function RevisionContentText({ content, noteId }: {
         if (!container) return;
 
         applyLinkEmbeds(container);
+        applyListItemAlignment(container);
         void applyReferenceLinks(container, noteId);
     }, [content, noteId]);
 
@@ -703,11 +707,18 @@ export function RevisionContentText({ content, noteId }: {
     return <RawHtmlBlock containerRef={contentRef} className="ck-content" html={sanitizeNoteContentHtml(content as string)} />;
 }
 
-function RevisionContentDiff({ noteContent, itemContent, itemType }: {
+export function RevisionContentDiff({ noteContent, itemContent, itemType }: {
     noteContent?: string,
     itemContent: string | Uint8Array | undefined,
     itemType: string
 }) {
+    const contentRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (contentRef.current) {
+            applyListItemAlignment(contentRef.current);
+        }
+    }, [ noteContent, itemContent, itemType ]);
+
     if (typeof itemContent !== "string") {
         return (
             <div className="revision-diff-content">
@@ -716,14 +727,17 @@ function RevisionContentDiff({ noteContent, itemContent, itemType }: {
         );
     }
 
-    let diffHtml: string;
+    let html: string;
     if (itemType === "text") {
         // Use proper HTML-aware diff for rich text content
-        diffHtml = HtmlDiff.execute(seedLinkPreviewTitles(noteContent), seedLinkPreviewTitles(itemContent));
+        html = diffHtml(
+            seedLinkPreviewTitles(noteContent) ?? "",
+            seedLinkPreviewTitles(itemContent) ?? ""
+        );
     } else {
         // Use word diff for code/mermaid (plain text)
         const diff = diffWords(noteContent ?? "", itemContent);
-        diffHtml = diff.map(part => {
+        html = diff.map(part => {
             if (part.added) {
                 return `<span class="revision-diff-added">${utils.escapeHtml(part.value)}</span>`;
             } else if (part.removed) {
@@ -734,13 +748,14 @@ function RevisionContentDiff({ noteContent, itemContent, itemType }: {
     }
 
     // Diff returned no results, meaning that they are identical.
-    if (!diffHtml) {
+    if (!html) {
         return <NoItems className="revision-diff-content" icon="bx bx-copy" text={t("revisions.diff_identical")} />;
     }
 
     return <SanitizedHtml
+        containerRef={contentRef}
         className={clsx("revision-diff-content", itemType === "text" ? "ck-content" : "revision-diff-code")}
-        html={diffHtml}
+        html={html}
     />;
 }
 
@@ -748,7 +763,7 @@ function RevisionContentDiff({ noteContent, itemContent, itemType }: {
  * Fills every link preview with a real link carrying the title it displays, so that the differ can
  * see it and the reader gets something they recognise as a link.
  *
- * htmldiff-js diffs words, and a link preview holds none: it is stored as an empty
+ * `diffHtml()` diffs words, and a link preview holds none: it is stored as an empty
  * `<span class="link-mention">` / `<section class="link-embed">` carrying its metadata in data
  * attributes, which only the note view turns into a card. Left alone the differ emits the element
  * unmarked whether it was added or removed, so a revision that gained a link and one that lost it

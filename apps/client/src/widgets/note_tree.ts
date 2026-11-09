@@ -224,7 +224,10 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         });
 
         // note tree starts initializing already during render which is atypical
-        Promise.all([options.initializedPromise, froca.initializedPromise]).then(() => this.initFancyTree());
+        Promise.all([options.initializedPromise, froca.initializedPromise]).then(() => {
+            this.applyDensity();
+            this.initFancyTree();
+        });
 
         this.setupNoteTitleTooltip();
     }
@@ -270,6 +273,11 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
 
     get treeScrollFollowNavigation() {
         return options.is("treeScrollFollowNavigation");
+    }
+
+    /** Makes the rows compact while the `treeDensity` option is `dense`. */
+    private applyDensity() {
+        this.$widget.toggleClass("dense", options.get("treeDensity") === "dense");
     }
 
     private toggleSettings(isShown: boolean) {
@@ -449,7 +457,11 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                 dragEnter: (node, data) => {
                     publishDropMarkerShift(node);
 
-                    if (node.data.noteType === "search") {
+                    // Content dragged out of a text note lists no notes, and its editor deletes
+                    // the content once a drop accepts it as a move.
+                    if (data.dataTransfer.types.includes("application/ckeditor5-dragging-uid")) {
+                        return false;
+                    } else if (node.data.noteType === "search") {
                         return false;
                     } else if (node.data.noteId === "_lbRoot") {
                         return false;
@@ -524,7 +536,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                         } else if (data.hitMode === "after") {
                             branchService.moveAfterBranch(selectedBranchIds, node.data.branchId);
                         } else if (data.hitMode === "over") {
-                            branchService.moveToParentNote(selectedBranchIds, node.data.branchId, this.componentId);
+                            branchService.moveToParentNote(selectedBranchIds, node.data.branchId, this.componentId, treeService.getNotePath(node));
                         } else {
                             throw new Error(`Unknown hitMode '${data.hitMode}'`);
                         }
@@ -796,16 +808,8 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
             extraClasses.push("shared");
         }
 
-        if (note.getParentNoteIds().length > 1) {
-            const realClones = note
-                .getParentNoteIds()
-                .map((noteId: string) => froca.notes[noteId])
-                .filter((note: FNote) => !!note)
-                .filter((note: FNote) => !["_share", "_lbBookmarks"].includes(note.noteId) && note.type !== "search");
-
-            if (realClones.length > 1) {
-                extraClasses.push("multiple-parents");
-            }
+        if (note.getRealParentNotes().length > 1) {
+            extraClasses.push("multiple-parents");
         }
 
         const cssClass = note.getCssClass();
@@ -1185,6 +1189,10 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
 
     async entitiesReloadedEvent({ loadResults }: EventData<"entitiesReloaded">) {
         this.activityDetected();
+
+        if (loadResults.isOptionReloaded("treeDensity")) {
+            this.applyDensity();
+        }
 
         if (loadResults.isEmptyForTree()) {
             return;
@@ -1670,7 +1678,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         const toNode = node.getPrevSibling();
 
         if (toNode !== null) {
-            branchService.moveToParentNote([node.data.branchId], toNode.data.branchId, this.componentId);
+            branchService.moveToParentNote([node.data.branchId], toNode.data.branchId, this.componentId, treeService.getNotePath(toNode));
         }
     }
 
@@ -1876,19 +1884,9 @@ function buildEnhanceTitle() {
         }
 
         // Add clone indicator with tooltip if note has multiple parents
-        const parentNotes = note.getParentNotes();
-        const realParents: FNote[] = [];
-        for (const parent of parentNotes) {
-            if (parent.noteId !== "_share" && parent.noteId !== "_lbBookmarks" && parent.type !== "search") {
-                realParents.push(parent);
-            }
-        }
-
+        const realParents = note.getRealParentNotes();
         if (realParents.length > 1) {
-            const parentTitles = realParents.map((p) => p.title).join(", ");
-            const tooltipText = realParents.length === 2
-                ? t("note_tree.clone-indicator-tooltip-single", { parent: realParents[1].title })
-                : t("note_tree.clone-indicator-tooltip", { count: realParents.length, parents: parentTitles });
+            const tooltipText = treeService.getCloneIndicatorTooltip(realParents);
 
             const $cloneIndicator = $(`<span class="note-indicator-icon clone-indicator"></span>`);
             $cloneIndicator.attr("title", tooltipText);

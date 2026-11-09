@@ -1,3 +1,4 @@
+import type { NoteType } from "@triliumnext/commons";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import froca from "../services/froca.js";
@@ -10,7 +11,7 @@ import FAttachment from "./fattachment.js";
 import FAttribute from "./fattribute.js";
 import FBlob from "./fblob.js";
 import FBranch from "./fbranch.js";
-import FNote, { type FNoteRow, type NoteType } from "./fnote.js";
+import FNote, { type FNoteRow } from "./fnote.js";
 
 vi.mock("../services/search.js", () => ({
     default: {
@@ -192,6 +193,31 @@ describe("FNote branches & children", () => {
 
         expect(child.getParentNoteIds()).toContain(parent.noteId);
         expect(child.getParentNotes().map((n) => n.noteId)).toContain(parent.noteId);
+    });
+
+    it("leaves the share root, the bookmarks and saved searches out of the real parents", () => {
+        const first = buildNote({ title: "First", children: [ { id: "cloned", title: "Cloned" } ] });
+        const cloned = froca.notes["cloned"];
+        if (!cloned) throw new Error("expected the cloned note");
+        expect(cloned.getRealParentNotes().map((n) => n.noteId)).toEqual([ first.noteId ]);
+
+        const second = buildNote({ title: "Second" });
+        const parents = [
+            buildNote({ id: "_share", title: "Share" }),
+            buildNote({ id: "_lbBookmarks", title: "Bookmarks" }),
+            buildNote({ title: "Saved search", type: "search" }),
+            second
+        ];
+        for (const parent of parents) {
+            const branchId = `${parent.noteId}_cloned`;
+            froca.branches[branchId] = new FBranch(froca, {
+                branchId, noteId: "cloned", parentNoteId: parent.noteId, notePosition: 0, fromSearchNote: false
+            });
+            parent.addChild("cloned", branchId, false);
+            cloned.addParent(parent.noteId, branchId, false);
+        }
+
+        expect(cloned.getRealParentNotes().map((n) => n.noteId)).toEqual([ first.noteId, second.noteId ]);
     });
 
     it("getChildNotes / getSubtreeNoteIds / getSubtreeNotes traverse the tree and skip archived", async () => {
@@ -1199,6 +1225,16 @@ describe("FNote system-note predicates", () => {
         expect(note.isJavaScript()).toBe(false);
         expect(note.isTriliumSqlite()).toBe(false);
         expect(note.getScriptEnv()).toBeNull();
+    });
+
+    it("title stays a string when a note row arrives without a title", () => {
+        const note = makeNote({ title: "Real title" });
+
+        // The same skeleton row as above; `NoteTreeWidget.getTitleHtml()` passes the title to
+        // `escapeHtml()`, which calls `.replace()` on it.
+        note.update({ noteId: note.noteId, blobId: "blob1", isProtected: false } as unknown as FNoteRow);
+
+        expect(note.title).toBe("");
     });
 
     it("getScriptEnv returns frontend / backend / null", () => {

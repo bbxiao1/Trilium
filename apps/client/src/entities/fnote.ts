@@ -1,4 +1,4 @@
-import { getNoteIcon, HighlightedTokenInfo, isMarkdownMime } from "@triliumnext/commons";
+import { getNoteIcon, HighlightedTokenInfo, isMarkdownMime, type NoteType } from "@triliumnext/commons";
 
 import cssClassManager from "../services/css_class_manager.js";
 import type { Froca } from "../services/froca-interface.js";
@@ -11,13 +11,6 @@ import type { AttributeType, default as FAttribute } from "./fattribute.js";
 
 const LABEL = "label";
 const RELATION = "relation";
-
-/**
- * There are many different Note types, some of which are entirely opaque to the
- * end user. Those types should be used only for checking against, they are
- * not for direct use.
- */
-export type NoteType = "file" | "image" | "search" | "noteMap" | "launcher" | "doc" | "contentWidget" | "text" | "relationMap" | "render" | "canvas" | "mermaid" | "book" | "webView" | "code" | "mindMap" | "spreadsheet" | "llmChat";
 
 export interface NotePathRecord {
     isArchived: boolean;
@@ -94,14 +87,14 @@ export default class FNote {
 
     update(row: FNoteRow) {
         this.noteId = row.noteId;
-        this.title = row.title;
         this.isProtected = !!row.isProtected;
         this.type = row.type;
 
-        // The server can send a row without a mime: becca materialises "skeleton" notes for
-        // entities that arrive out of order during sync, and their undefined mime/title are dropped
-        // outright by JSON serialisation. Defaulting keeps the mime predicates (isTriliumScript(),
-        // isJavaScript(), ...) from throwing until the real row syncs in.
+        // The server can send a row without a mime or title: becca materialises "skeleton" notes
+        // for entities that arrive out of order during sync, and JSON serialisation drops their
+        // undefined mime/title. Defaulting keeps the mime predicates (isTriliumScript(), ...) and
+        // title consumers (escapeHtml() in the tree) from throwing until the real row syncs in.
+        this.title = row.title ?? "";
         this.mime = row.mime ?? "";
 
         this.blobId = row.blobId;
@@ -211,6 +204,15 @@ export default class FNote {
 
     getParentNotes() {
         return this.froca.getNotesFromCache(this.parents);
+    }
+
+    /**
+     * The parent notes that make this note a clone: the share root, the bookmarks and saved
+     * searches also hold the note as a child, but the tree does not count them.
+     */
+    getRealParentNotes() {
+        return this.getParentNotes().filter((parent) =>
+            parent.noteId !== "_share" && parent.noteId !== "_lbBookmarks" && parent.type !== "search");
     }
 
     // will sort the parents so that non-search & non-archived are first and archived at the end

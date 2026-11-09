@@ -172,6 +172,24 @@ describe("tabs layout styles", () => {
         }
     });
 
+    it("trims the outer margins of the shown panel's content, saved and edited", async () => {
+        const html = `<div class="trilium-tabs">` +
+            `${tab("A", "<p>First</p><p>Middle</p><p>Last</p>")}${tab("B", "<p>Other</p>")}</div>`;
+        const editor = await createTestEditor([Essentials, Paragraph, Tabs]);
+        editor.setData(html);
+        const editable = editor.ui.view.editable.element as HTMLElement;
+
+        for (const root of [renderSaved(html).container, editable]) {
+            const panel = root.querySelector(".trilium-tab--active > .trilium-tab-panel");
+            const blocks = [...panel?.querySelectorAll(":scope > p") ?? []];
+            expect(blocks.map(block => block.textContent)).toEqual(["First", "Middle", "Last"]);
+            const [first, middle, last] = blocks.map(block => getComputedStyle(block));
+            expect({ top: first.marginTop, bottom: last.marginBottom })
+                .toEqual({ top: "0px", bottom: "0px" });
+            expect(middle.marginTop).not.toBe("0px");
+        }
+    });
+
     it("clips a long title at 30% of the block (45% on mobile) and scrolls it back", async () => {
         const long = tab("A title far too long for a third of the block", "<p>Body</p>");
         const html = `<div class="trilium-tabs">${long}${tab("B", "")}</div>`;
@@ -230,10 +248,10 @@ describe("tabs layout styles", () => {
         editor.editing.view.document.isFocused = true;
         const rootStyle = document.documentElement.style;
         rootStyle.setProperty("--ck-color-focus-border", "rgb(12, 34, 56)");
-        rootStyle.setProperty("--link-color", "rgb(65, 43, 21)");
+        rootStyle.setProperty("--input-focus-outline-color", "rgb(65, 43, 21)");
         onTestFinished(() => {
             rootStyle.removeProperty("--ck-color-focus-border");
-            rootStyle.removeProperty("--link-color");
+            rootStyle.removeProperty("--input-focus-outline-color");
         });
         const inner = `<div class="trilium-tabs">${tab("B1", "<p>b1</p>")}${tab("B2", "")}</div>`;
         editor.setData(
@@ -241,6 +259,8 @@ describe("tabs layout styles", () => {
         );
         const blocks = [...editable.querySelectorAll<HTMLElement>(".trilium-tabs.ck-widget")];
         const outlines = () => blocks.map(block => getComputedStyle(block).outlineColor);
+        const focused = () => blocks.map(block =>
+            block.classList.contains("trilium-tabs--focused"));
         const ring = (element: Element | null) => {
             expect(element).not.toBeNull();
             const style = getComputedStyle(element as Element);
@@ -259,12 +279,14 @@ describe("tabs layout styles", () => {
         const innerPanel = blocks[1].querySelector(".trilium-tab-panel");
         expect(ring(innerPanel)).toEqual(["rgba(0, 0, 0, 0)", "none", "0s"]);
         await expect.poll(outlines).toEqual(["rgba(0, 0, 0, 0)", "rgb(65, 43, 21)"]);
+        expect(focused()).toEqual([false, true]);
 
         select([1, 0, 0, 0]);
         const outerTitle = blocks[0].querySelector(".trilium-tab-title");
         expect(ring(outerTitle).filter((_, index) => index !== 1))
             .toEqual(["rgb(12, 34, 56)", "0s"]);
         await expect.poll(outlines).toEqual(["rgb(65, 43, 21)", "rgba(0, 0, 0, 0)"]);
+        expect(focused()).toEqual([true, false]);
     });
 
     it("keeps overflowing titles on one scrolling row and rounds the panel corners", async () => {
@@ -344,6 +366,30 @@ describe("tabs layout styles", () => {
         editor.execute("moveTab", { target: "first" });
         expect(edited.viewport.scrollLeft).toBe(0);
         expect(edited.viewport.firstElementChild?.textContent).toBe("Step 10 of the guide");
+    });
+
+    it("skips a title removed before its reveal and reveals the one shown instead", async () => {
+        document.body.classList.add("motion-disabled");
+        onTestFinished(() => document.body.classList.remove("motion-disabled"));
+        const editor = await createTestEditor([Essentials, Paragraph, Tabs]);
+        const editable = editor.ui.view.editable.element as HTMLElement;
+        editable.style.width = "400px";
+        editor.setData(manyTabsHtml());
+        const { bar, viewport } = barOf(editable);
+        const tabs = editor.model.document.getRoot()?.getChild(0) as ModelElement;
+        const lastTab = tabs.getChild(9) as ModelElement;
+        await expect.poll(() => isOverflowing(bar)).toBe(true);
+
+        // The queued change removes the tab before the view renders the change that showed it.
+        editor.model.change(writer => {
+            writer.setSelection(lastTab.getChild(1) as ModelElement, 0);
+            editor.model.enqueueChange(queuedWriter => queuedWriter.remove(lastTab));
+        });
+
+        const lastTitle = viewport.lastElementChild as HTMLElement;
+        expect(lastTitle.textContent).toBe("Step 9 of the guide");
+        expect(lastTitle.classList.contains("trilium-tab-title--active")).toBe(true);
+        expect(isShown(lastTitle, viewport)).toBe(true);
     });
 
     it("reveals the title of a nested tab that was hidden in saved content", async () => {

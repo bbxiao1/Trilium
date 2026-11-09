@@ -19,6 +19,7 @@ import "./content/link_embed.css";
 import "./content/full_height.css";
 import "./content/app_view.css";
 import setupCodeCopy from "./content/code_copy.js";
+import setupInPageLinks from "./content/in_page_links.js";
 import setupMath from "./content/math.js";
 import setupAppView from "./content/app_view.js";
 import setupMermaid from "./content/mermaid.js";
@@ -34,6 +35,9 @@ import "@triliumnext/ckeditor5/src/theme/table_sticky_header.css";
 import "@triliumnext/ckeditor5/src/theme/todo_lists.css";
 import "@triliumnext/commons/src/lib/scroll_fade.css";
 
+import {
+    applyListItemAlignment
+} from "@triliumnext/ckeditor5/src/plugins/list_item_alignment_read_only.js";
 import { applyTableScroll } from "@triliumnext/ckeditor5/src/plugins/table_scroll_read_only.js";
 import {
     applyStickyTableHeaders
@@ -79,9 +83,12 @@ function setupTextNote() {
     const diagrams = $try(setupMermaid);
     $try(setupMath);
     $try(setupCodeCopy);
+    $try(setupInPageLinks);
     $try(() => enhanceLinkPreviews(document.body));
     $try(setupTableScroll);
+    $try(setupDrawingPictures);
     $try(setupStickyTableHeaders);
+    $try(setupListItemAlignment);
     $try(setupTabs);
     return diagrams;
 }
@@ -114,10 +121,31 @@ function setupTableScroll() {
     }
 }
 
+/**
+ * Keeps the picture of each drawing canvas centered in its box, which `content.css` sizes by the
+ * width the page writes on it and which crops the picture where the page is narrower.
+ */
+function setupDrawingPictures() {
+    for (const box of document.querySelectorAll<HTMLElement>("#content .canvas-drawing-box")) {
+        const center = () => {
+            box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
+        };
+        center();
+        new ResizeObserver(center).observe(box);
+    }
+}
+
 function setupStickyTableHeaders() {
     const content = document.getElementById("content");
     if (content) {
         applyStickyTableHeaders(content);
+    }
+}
+
+function setupListItemAlignment() {
+    const content = document.getElementById("content");
+    if (content) {
+        applyListItemAlignment(content);
     }
 }
 

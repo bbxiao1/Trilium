@@ -4,12 +4,12 @@
  * elements carrying metadata. Rendering the stored HTML on its own therefore shows less than the
  * note does, and in the case of a link preview shows nothing at all (#10707).
  */
-import HtmlDiff from "htmldiff-js";
 import { describe, expect, it, vi } from "vitest";
 
+import { diffHtml } from "../../services/html_diff";
 import { buildNote } from "../../test/easy-froca";
 import { renderInto } from "../../test/render";
-import { RevisionContentText, seedLinkPreviewTitles } from "./revisions";
+import { RevisionContentDiff, RevisionContentText, seedLinkPreviewTitles } from "./revisions";
 
 vi.mock("../../services/i18n", () => ({ t: (key: string) => key }));
 
@@ -27,7 +27,7 @@ async function renderRevision(content: string, noteId = "revisedNote") {
 }
 
 describe("RevisionContentText", () => {
-    it("renders an inline link preview that is stored as an empty element", async () => {
+    it("renders an icon & text link that is stored as an empty element", async () => {
         const container = await renderRevision(
             '<p>before</p><p><span class="link-mention" data-url="https://github.com/TriliumNext/Trilium/issues"'
             + ' data-title="Issues · TriliumNext/Trilium"></span></p><p>after</p>'
@@ -50,6 +50,16 @@ describe("RevisionContentText", () => {
 
         await vi.waitFor(() => {
             expect(container.querySelector("section.link-embed")?.textContent).toContain("A post");
+        });
+    });
+
+    it("marks the list items whose first paragraph is aligned", async () => {
+        const container = await renderRevision(
+            "<p>before</p><ul><li><p style=\"text-align:center;\">a</p></li><li>b</li></ul>");
+
+        await vi.waitFor(() => {
+            expect([ ...container.querySelectorAll("li") ].map((item) => item.className))
+                .toEqual([ "trilium-list-item-aligned-center", "" ]);
         });
     });
 
@@ -87,6 +97,23 @@ describe("RevisionContentText", () => {
         const container = await renderRevision('<p>before</p><p><span class="link-mention" data-title="No URL"></span></p>');
 
         expect(container.querySelector("a.link-embed-mention")).toBeNull();
+    });
+});
+
+describe("RevisionContentDiff", () => {
+    it("marks the list items whose first paragraph is aligned", async () => {
+        const list = "<ul><li><p style=\"text-align:center;\">a</p></li><li>b</li></ul>";
+        const container = renderInto(<RevisionContentDiff
+            noteContent={`<p>before</p>${list}`}
+            itemContent={`<p>after</p>${list}`}
+            itemType="text"
+        />);
+
+        await vi.waitFor(() => {
+            const items = container.querySelectorAll(".ck-content li");
+            expect([ ...items ].map((item) => item.className))
+                .toEqual([ "trilium-list-item-aligned-center", "" ]);
+        });
     });
 });
 
@@ -130,12 +157,12 @@ describe("seedLinkPreviewTitles", () => {
         const withPreview = seedLinkPreviewTitles(`<p>x</p><p>${mention}</p>`);
         const without = seedLinkPreviewTitles("<p>x</p>");
 
-        const added = HtmlDiff.execute(without, withPreview);
-        const removed = HtmlDiff.execute(withPreview, without);
+        const added = diffHtml(without ?? "", withPreview ?? "");
+        const removed = diffHtml(withPreview ?? "", without ?? "");
 
         expect(added).toContain("diffins");
         expect(removed).toContain("diffdel");
-        // Unseeded, htmldiff-js emits these two byte-identical: the empty element carries no word
+        // Unseeded, `diffHtml()` emits these two byte-identical: the empty element carries no word
         // for it to compare, so neither direction produces a marker at all.
         expect(added).not.toBe(removed);
     });

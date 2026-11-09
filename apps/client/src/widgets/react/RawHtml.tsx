@@ -39,11 +39,7 @@ export function getHtml(html: HTMLElementLike) {
     };
 }
 
-/**
- * Renders plain text with search-match highlighting. The text is set imperatively so mark.js,
- * which injects `.ck-find-result` spans around matches, does not fight Preact's reconciliation
- * of a controlled text child.
- */
+/** Renders plain text with search-match highlighting. */
 export function HighlightedText({ className, text, highlightedTokens }: {
     className?: string;
     text: string;
@@ -52,16 +48,12 @@ export function HighlightedText({ className, text, highlightedTokens }: {
     const ref = useRef<HTMLSpanElement>(null);
     const highlight = useImperativeSearchHighlighlighting(highlightedTokens);
 
-    // Before the paint, so the span is not drawn empty for a frame first. `highlight` is a fresh
-    // closure each render, so the effect keys on the token list instead.
+    // Before the paint, so the text is not drawn unhighlighted for a frame first. `highlight` is a
+    // fresh closure each render, so the effect keys on the token list instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useLayoutEffect(() => {
-        if (!ref.current) return;
-        ref.current.textContent = text;
-        highlight(ref.current);
-    }, [ text, highlightedTokens ]);
+    useLayoutEffect(() => highlight(ref.current), [ text, highlightedTokens ]);
 
-    return <span className={className} ref={ref} />;
+    return <span className={className} ref={ref}>{text}</span>;
 }
 
 /**
@@ -69,9 +61,15 @@ export function HighlightedText({ className, text, highlightedTokens }: {
  * Use this instead of {@link RawHtml} when the HTML originates from
  * untrusted sources (e.g. LLM responses, user-generated markdown).
  */
-export function SanitizedHtml({ className, html, style }: { className?: string; html?: HTMLElementLike; style?: CSSProperties }) {
+export function SanitizedHtml({ className, html, style, containerRef }: {
+    className?: string;
+    html?: HTMLElementLike;
+    style?: CSSProperties;
+    containerRef?: RefObject<HTMLDivElement | null>;
+}) {
     return (
         <div
+            ref={containerRef}
             className={className}
             style={style}
             // eslint-disable-next-line react/no-danger

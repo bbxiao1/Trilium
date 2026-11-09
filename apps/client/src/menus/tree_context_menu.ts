@@ -74,10 +74,10 @@ export interface TreeContextMenuContext {
      */
     target?: "desktop" | "mobile";
     /**
-     * Invoked right before any command's handler runs. Fancytree uses this to
-     * switch to the detail screen on mobile so dialogs/navigations are visible.
+     * Invoked right before a command in `COMMANDS_THAT_SHOW_A_NOTE` runs. On mobile, callers
+     * switch to the detail screen here so that the note the command opens is visible.
      */
-    onBeforeCommand?: () => void;
+    onRevealNote?: () => void;
     /**
      * Fancytree node for the target, when available. A handful of tree
      * commands (cut/paste/export/expand/collapse/sort) read `node.data` or call
@@ -195,8 +195,13 @@ export async function buildTreeContextMenuItems(ctx: TreeContextMenuContext): Pr
 
         { kind: "separator" },
 
-        // As the link context menu has it: the row opens a new tab, its arrow the other places.
-        {
+        // As the link context menu has it: the row opens a new tab, its arrow the other places. A
+        // mobile menu runs no action of a submenu's row, so there the places are rows of their own.
+        ...(isMobileTarget ? [
+            { title: t("tree-context-menu.open"), command: "openNote", uiIcon: "bx bx-file", enabled: noSelectedNotes },
+            { title: t("tree-context-menu.open-in-a-new-tab"), command: "openInTab", uiIcon: "bx bx-link-external", enabled: noSelectedNotes },
+            { title: t("tree-context-menu.open-in-a-new-split"), command: "openNoteInSplit", uiIcon: "bx bx-dock-right", enabled: noSelectedNotes }
+        ] satisfies MenuItem<TreeCommandNames>[] : [ {
             title: t("link_context_menu.open_note"),
             command: "openInTab",
             uiIcon: "bx bx-link-external",
@@ -206,7 +211,7 @@ export async function buildTreeContextMenuItems(ctx: TreeContextMenuContext): Pr
                 { title: t("tree-context-menu.open-in-a-new-split"), command: "openNoteInSplit", uiIcon: "bx bx-dock-right" },
                 { title: t("tree-context-menu.open-in-a-new-window"), command: "openNoteInWindow", uiIcon: "bx bx-window-open" }
             ]
-        },
+        } satisfies MenuItem<TreeCommandNames> ]),
         { title: t("tree-context-menu.open-in-popup"), command: "openNoteInPopup", uiIcon: "bx bx-edit", enabled: noSelectedNotes },
 
         isHoisted
@@ -399,9 +404,13 @@ export async function handleTreeContextMenuSelect(
     const resolved = resolveContext(ctx);
     const { note, branch, notePath, component, selectedOrActiveBranchIds, selectedOrActiveNoteIds } = resolved;
 
-    resolved.onBeforeCommand?.();
+    if (command && COMMANDS_THAT_SHOW_A_NOTE.has(command)) {
+        resolved.onRevealNote?.();
+    }
 
-    if (command === "openInTab") {
+    if (command === "openNote") {
+        await (resolved.noteContext ?? appContext.tabManager.getActiveContext())?.setNote(notePath);
+    } else if (command === "openInTab") {
         appContext.tabManager.openTabWithNoteWithHoisting(notePath, { placement: "afterCurrent" });
     } else if (command === "insertNoteAfter") {
         const parentNotePath = parentNotePathOf(notePath);
@@ -472,6 +481,19 @@ export async function handleTreeContextMenuSelect(
         });
     }
 }
+
+/**
+ * The commands whose result is a note on the detail screen: a new note, a duplicate, a split or a
+ * search. Every other command acts on the tree, the clipboard or a dialog, so the tree stays shown.
+ */
+const COMMANDS_THAT_SHOW_A_NOTE = new Set<TreeCommandNames>([
+    "insertNoteAfter",
+    "insertChildNote",
+    "duplicateNote",
+    "duplicateSubtree",
+    "openNoteInSplit",
+    "searchInSubtree"
+]);
 
 /**
  * The choice between copying the children or not, offered only when a note to copy has children.
@@ -548,7 +570,7 @@ export default class TreeContextMenu implements SelectMenuItemEventListener<Tree
             selectedNotes,
             isSpotlighted: this.node.extraClasses.includes("spotlighted-node"),
             node: this.node,
-            onBeforeCommand: () => {
+            onRevealNote: () => {
                 if (utils.isMobile()) {
                     this.treeWidget.triggerCommand("setActiveScreen", { screen: "detail" });
                 }
